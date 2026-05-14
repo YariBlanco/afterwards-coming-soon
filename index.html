@@ -351,18 +351,28 @@ body::after {
   <p class="subhead anim anim-4">Built for the afterwards nobody prepares you for.<br><br>Grief and community care.</p>
 
   <div class="form-wrap anim anim-5">
-    <label class="form-label" for="email-input">Be the first to know when we open our doors</label>
-    <div class="form-row">
-      <input
-        class="form-input"
-        id="email-input"
-        type="email"
-        placeholder="your@email.com"
-        autocomplete="email"
-      >
-      <button class="form-btn" onclick="handleSignup()">Join the list</button>
+    <label class="form-label" for="newsletter-form-input">Be the first to know when we open our doors</label>
+    <form class="newsletter-form" action="https://app.loops.so/api/newsletter-form/cmn7hmneo01qe0i0a3dxid7se" method="POST" onsubmit="submitHandler(event)">
+      <div class="form-row">
+        <input
+          class="form-input newsletter-form-input"
+          id="newsletter-form-input"
+          name="newsletter-form-input"
+          type="email"
+          placeholder="your@email.com"
+          autocomplete="email"
+          required
+        >
+        <button type="submit" class="form-btn newsletter-form-button">Join the list</button>
+        <button type="button" class="form-btn newsletter-loading-button" style="display:none;">Please wait...</button>
+      </div>
+    </form>
+    <div class="newsletter-success" style="display:none; justify-content:center; margin-top:16px;">
+      <p class="success-msg visible" style="font-family:'NyghtSerif',serif; font-style:italic; font-size:16px; color:var(--butter);">You're on the list. We'll be in touch. 🤍</p>
     </div>
-    <p class="success-msg" id="success-msg">You're on the list. We'll be in touch. 🤍</p>
+    <div class="newsletter-error" style="display:none; justify-content:center; margin-top:12px;">
+      <p class="newsletter-error-message" style="font-family:'ClashDisplay',sans-serif; font-size:12px; color:#fa9a89;">Oops! Something went wrong, please try again.</p>
+    </div>
     <p class="privacy">No spam. Just the things that matter.</p>
   </div>
 
@@ -371,31 +381,68 @@ body::after {
 <p class="tagline">grief support · made real · theafterwards.co</p>
 
 <script>
-  function handleSignup() {
-    const input = document.getElementById('email-input');
-    const email = input.value.trim();
-    if (!email || !email.includes('@')) {
-      input.style.color = 'rgba(250,154,137,0.8)';
-      input.placeholder = 'please enter a valid email';
-      input.focus();
-      setTimeout(() => {
-        input.style.color = '';
-        input.placeholder = 'your@email.com';
-      }, 2000);
+  function submitHandler(event) {
+    event.preventDefault();
+    var container = event.target.parentNode;
+    var form = container.querySelector(".newsletter-form");
+    var formInput = container.querySelector(".newsletter-form-input");
+    var success = container.querySelector(".newsletter-success");
+    var errorContainer = container.querySelector(".newsletter-error");
+    var errorMessage = container.querySelector(".newsletter-error-message");
+    var submitButton = container.querySelector(".newsletter-form-button");
+    var loadingButton = container.querySelector(".newsletter-loading-button");
+
+    const rateLimit = () => {
+      errorContainer.style.display = "flex";
+      errorMessage.innerText = "Too many signups, please try again in a little while";
+      submitButton.style.display = "none";
+      formInput.style.display = "none";
+    };
+
+    var time = new Date();
+    var timestamp = time.valueOf();
+    var previousTimestamp = localStorage.getItem("loops-form-timestamp");
+    if (previousTimestamp && Number(previousTimestamp) + 60000 > timestamp) {
+      rateLimit();
       return;
     }
-    const emails = JSON.parse(localStorage.getItem('afterwards_emails') || '[]');
-    emails.push({ email, date: new Date().toISOString() });
-    localStorage.setItem('afterwards_emails', JSON.stringify(emails));
-    input.value = '';
-    document.querySelector('.form-row').style.opacity = '0.4';
-    document.querySelector('.form-btn').disabled = true;
-    document.getElementById('success-msg').classList.add('visible');
-  }
+    localStorage.setItem("loops-form-timestamp", timestamp);
 
-  document.getElementById('email-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') handleSignup();
-  });
+    submitButton.style.display = "none";
+    loadingButton.style.display = "flex";
+
+    var formBody = "userGroup=&mailingLists=&email=" + encodeURIComponent(formInput.value);
+
+    fetch(event.target.action, {
+      method: "POST",
+      body: formBody,
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    })
+      .then((res) => [res.ok, res.json(), res])
+      .then(([ok, dataPromise, res]) => {
+        if (ok) {
+          success.style.display = "flex";
+          form.reset();
+          formInput.style.display = "none";
+          loadingButton.style.display = "none";
+        } else {
+          dataPromise.then(data => {
+            errorContainer.style.display = "flex";
+            errorMessage.innerText = data.message ? data.message : res.statusText;
+            loadingButton.style.display = "none";
+            submitButton.style.display = "flex";
+          });
+        }
+      })
+      .catch(error => {
+        if (error.message === "Failed to fetch") { rateLimit(); return; }
+        errorContainer.style.display = "flex";
+        if (error.message) errorMessage.innerText = error.message;
+        localStorage.setItem("loops-form-timestamp", '');
+        loadingButton.style.display = "none";
+        submitButton.style.display = "flex";
+      });
+  }
 </script>
 
 </body>
